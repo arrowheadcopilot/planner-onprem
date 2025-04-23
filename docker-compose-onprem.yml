@@ -1,0 +1,106 @@
+services:
+
+  service-config:
+    image: arrowheadcopilot/service-config-python:packaged
+    container_name: service-config
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      LANGFUSE_PUBLICKEY: ${LANGFUSE_PK}
+      LANGFUSE_SECRETKEY: ${LANGFUSE_SK}
+      LANGFUSE_HOST: ${LANGFUSE_HOST}
+      NOSQLDBS_MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+
+    ports:
+      - ${CONFIG_SERVICE_PORT}:8000
+    networks:
+      - appnetwork
+
+
+  service-frontend:
+    image: arrowheadcopilot/webapp-frontend-angular:onprem
+    container_name: service-frontend
+    restart: unless-stopped
+    ports:
+      - ${FRONTEND_PORT}:4200
+    environment:
+      RUN_CONFIG: "dynamic"
+      STANDALONE_SERVICE_URL_FOR_PLANNER: "${FRONTEND_PLANNER_URL}:${PLANNER_PORT}"
+      STANDALONE_SERVICE_URL_FOR_CONFIG: "${FRONTEND_CONFIG_SERVICE_URL}:${CONFIG_SERVICE_PORT}"
+      PLANNER_SERVICE_URL: ""
+      PLUGIN_SERVICE_URL: "/plugins"
+      TEMPLATE_SERVICE_URL: "/templates"
+      EXIT_PERIOD: 300000
+      LOGO: "AIM.png"
+      CHAT_LOGO: "AIM.png"
+      BASE_HREF: "/"
+      CHAT: false
+      DOCUMENTS: false
+      TEMPLATES: false
+      PLUGINS: true
+      PLANNER: true
+      PLAN: true
+      LOGIN: false
+      STANDALONE: true  
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - service-planner
+      - service-config
+    networks:
+      - appnetwork
+
+  service-planner:
+    image: arrowheadcopilot/service-planner-python:packaged
+    container_name: service-planner
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    environment:
+      SERVICE_AUTHENTICATIONENABLED: ""
+      LLMS_SELECTEDTYPE: "LangchainAzure"
+      LLMS_LANGCHAINAZURE_ENDPOINT: ${LLM_ENDPOINT}
+      LLMS_LANGCHAINAZURE_APIKEY: ${LLM_APIKEY}
+      LLMS_LANGCHAINAZURE_APIVERSION: ${LLM_APIVERSION}
+      LLMS_LANGCHAINAZURE_DEPLOYMENTNAME: ${LLM_MODELNAME}
+      LLMS_LANGCHAINAZURE_MODELNAME: ${LLM_MODELNAME}
+      NOSQLDBS_MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      LANGFUSE_PUBLICKEY: ${LANGFUSE_PK}
+      LANGFUSE_SECRETKEY: ${LANGFUSE_SK}
+      LANGFUSE_HOST: ${LANGFUSE_HOST}
+    networks:
+      - appnetwork
+    ports:
+      - ${PLANNER_PORT}:8000
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo
+    container_name: mongo
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongoadmin 
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+    volumes:
+      - ${MONGODB_DATA_DIR}:/data/db
+    ports:
+      - 27017:27017
+    networks:
+      - appnetwork 
+     
+networks:
+  appnetwork:
+    driver: bridge
+    #external: true
